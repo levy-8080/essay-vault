@@ -1,3 +1,10 @@
+// Replace with your actual Supabase URL and Anon Public Key
+const SUPABASE_URL = 'https://jboqpkflktriltvichvy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WCRT11CQKRrGVeL1DZn9mw_GzzUiHth';
+
+// CORRECTED: Pass the defined variables into the client initialization
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const form = document.getElementById("entry-form");
 const textInput = document.getElementById("text-input");
 const submitBtn = document.getElementById("submit-btn");
@@ -10,33 +17,55 @@ let entries = [];
 
 /**
  * --- Database hook ---
- * Replace the body of this function with your real database call later,
- * e.g. `await fetch("/api/entries", { method: "POST", ... })`.
- * It must return the saved entry: { id, text, createdAt }.
+ * Inserts the text into the cloud database and returns the created row.
  */
 async function saveEntry(text) {
+  const { data, error } = await supabase
+    .from("essays")
+    .insert([{ content: text }])
+    .select()
+    .single();
+
+  if (error) throw error;
+
   return {
-    id: crypto.randomUUID(),
-    text,
-    createdAt: new Date().toISOString(),
+    id: data.id,
+    text: data.content,
+    createdAt: data.created_at,
   };
 }
 
 /**
  * --- Database hook ---
- * Replace with a call that loads your existing entries from the database,
- * e.g. `return fetch("/api/entries").then((r) => r.json())`.
+ * Fetches all saved essays from the database ordered by newest first.
  */
 async function loadEntries() {
-  return [];
+  const { data, error } = await supabase
+    .from("essays")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data.map((essay) => ({
+    id: essay.id,
+    text: essay.content,
+    createdAt: essay.created_at,
+  }));
 }
 
 /**
  * --- Database hook ---
- * Replace with a call that deletes the entry from the database,
- * e.g. `await fetch("/api/entries/" + id, { method: "DELETE" })`.
+ * Deletes the matching row from the cloud database and clears it locally.
  */
 async function deleteEntry(id) {
+  const { error } = await supabase
+    .from("essays")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+
   entries = entries.filter((entry) => entry.id !== id);
 }
 
@@ -70,9 +99,15 @@ function renderEntry(entry) {
   removeBtn.setAttribute("aria-label", "Delete entry");
   removeBtn.addEventListener("click", async () => {
     removeBtn.disabled = true;
-    await deleteEntry(entry.id);
-    li.remove();
-    renderAll();
+    try {
+      await deleteEntry(entry.id);
+      li.remove();
+      renderAll();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete entry from database.");
+      removeBtn.disabled = false;
+    }
   });
 
   li.append(p, removeBtn);
