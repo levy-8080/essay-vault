@@ -1,44 +1,22 @@
-// 1. SETUP - Uses your specific keys
+// 1. CREDENTIALS
 const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_WCRT11CQKRrGVeL1DZn9mw_GzzUiHth';
 
-// Alert 1: Check if script starts
-alert("Step 1: Script is running!");
-
-if (!window.supabase) {
-  alert("CRITICAL ERROR: Supabase library not found. Check your HTML script tag!");
-}
-
+// 2. INITIALIZATION (Uses the library loaded in index.html)
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// 3. DOM ELEMENTS
 const form = document.getElementById("entry-form");
 const textInput = document.getElementById("text-input");
 const submitBtn = document.getElementById("submit-btn");
+const statusEl = document.getElementById("status");
 const entriesEl = document.getElementById("entries");
-const countEl = document.getElementById("count");
 const emptyStateEl = document.getElementById("empty-state");
+const countEl = document.getElementById("count");
 
 let entries = [];
 
-async function loadEntries() {
-  // Alert 2: Check if we are trying to fetch data
-  console.log("Step 2: Attempting to load entries...");
-  
-  const { data, error } = await supabase
-    .from("essays")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    alert("DATABASE ERROR loading entries: " + error.message);
-    console.error(error);
-    return [];
-  }
-  
-  // Alert 3: Success if we get here
-  console.log("Success! Loaded " + data.length + " entries.");
-  return data.map(e => ({ id: e.id, text: e.content, createdAt: e.created_at }));
-}
+// --- DATABASE FUNCTIONS ---
 
 async function saveEntry(text) {
   const { data, error } = await supabase
@@ -47,72 +25,130 @@ async function saveEntry(text) {
     .select()
     .single();
 
-  if (error) {
-    alert("SAVE ERROR: " + error.message); 
-    throw error;
-  }
+  if (error) throw error;
 
-  return { id: data.id, text: data.content, createdAt: data.created_at };
+  return {
+    id: data.id,
+    text: data.content,
+    createdAt: data.created_at,
+  };
+}
+
+async function loadEntries() {
+  const { data, error } = await supabase
+    .from("essays")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data.map((essay) => ({
+    id: essay.id,
+    text: essay.content,
+    createdAt: essay.created_at,
+  }));
 }
 
 async function deleteEntry(id) {
-  const { error } = await supabase.from("essays").delete().eq("id", id);
-  if (error) {
-    alert("DELETE ERROR: " + error.message);
-    throw error;
-  }
+  const { error } = await supabase
+    .from("essays")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+
+  entries = entries.filter((entry) => entry.id !== id);
 }
 
-// ... (Rendering logic remains the same) ...
+// --- UI FUNCTIONS ---
+
+function setStatus(message, type = "") {
+  statusEl.textContent = message;
+  statusEl.className = "status" + (type ? " status--" + type : "");
+  // Clear status after 3 seconds
+  if (message) setTimeout(() => (statusEl.textContent = ""), 3000);
+}
+
 function renderEntry(entry) {
   const li = document.createElement("li");
   li.className = "entry";
-  li.innerHTML = `
-    <p class="entry__text">${entry.text} <span class="entry__time">${new Date(entry.createdAt).toLocaleString()}</span></p>
-    <button class="entry__delete" aria-label="Delete entry">×</button>
-  `;
-  li.querySelector("button").addEventListener("click", async () => {
-    if(confirm("Delete this?")) {
+
+  const p = document.createElement("p");
+  p.className = "entry__text";
+  p.textContent = entry.text;
+
+  const time = document.createElement("span");
+  time.className = "entry__time";
+  time.textContent = new Date(entry.createdAt).toLocaleString();
+  p.appendChild(time);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "entry__delete";
+  removeBtn.innerHTML = "&times;"; // X symbol
+  removeBtn.title = "Delete entry";
+  
+  removeBtn.addEventListener("click", async () => {
+    if (!confirm("Delete this essay?")) return;
+    
+    removeBtn.disabled = true;
+    try {
       await deleteEntry(entry.id);
       li.remove();
-      entries = entries.filter(e => e.id !== entry.id);
       renderAll();
+    } catch (error) {
+      console.error(error);
+      alert("Error deleting entry");
+      removeBtn.disabled = false;
     }
   });
+
+  li.append(p, removeBtn);
   return li;
 }
 
 function renderAll() {
   entriesEl.replaceChildren(...entries.map(renderEntry));
-  countEl.textContent = entries.length;
+  countEl.textContent = String(entries.length);
   emptyStateEl.hidden = entries.length > 0;
 }
 
-// ... (Event Listeners) ...
+// --- EVENT LISTENERS ---
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+
   const text = textInput.value.trim();
   if (!text) return;
 
-  alert("Step 3: Sending data to Supabase..."); // Alert on click
+  submitBtn.disabled = true;
+  setStatus("Saving...");
 
   try {
     const saved = await saveEntry(text);
     entries = [saved, ...entries];
     renderAll();
     form.reset();
-    alert("Step 4: SUCCESS! Entry Saved.");
+    setStatus("Saved!", "success");
   } catch (error) {
-    // The alert inside saveEntry will show the specific error message
+    console.error(error);
+    setStatus("Error saving.", "error");
+  } finally {
+    submitBtn.disabled = false;
   }
 });
 
-// Initialization
+form.addEventListener("reset", () => {
+  setStatus("");
+});
+
+// --- STARTUP ---
+
 (async function init() {
   try {
     entries = await loadEntries();
     renderAll();
   } catch (error) {
-    alert("INIT ERROR: " + error.message);
+    console.error(error);
+    setStatus("Connection error.", "error");
   }
 })();
