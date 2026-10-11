@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Essay Vault</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Essay Vault</h1>
+      <p class="app__subtitle">Write something and save it to your vault.</p>
+    </header>
+
+    <form id="entry-form" class="card" autocomplete="off">
+      <label class="field">
+        <span class="field__label">Text</span>
+        <textarea
+          id="text-input"
+          name="text"
+          class="field__input"
+          rows="8"
+          placeholder="Type or paste your text here..."
+          required
+        ></textarea>
+      </label>
+
+      <div class="actions">
+        <button type="submit" id="submit-btn" class="btn btn--primary">Save</button>
+        <button type="reset" id="clear-btn" class="btn btn--ghost">Clear</button>
+        <span id="status" class="status" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+
+    <section class="card">
+      <div class="card__head">
+        <h2>Saved entries</h2>
+        <span id="count" class="badge">0</span>
+      </div>
+      <ul id="entries" class="entries"></ul>
+      <p id="empty-state" class="empty">No entries yet.</p>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
